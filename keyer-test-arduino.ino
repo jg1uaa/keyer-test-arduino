@@ -217,7 +217,7 @@ static int set_maxpos(void)
 	unsigned short n;
 
 	while (Serial.available() < 1);
-	if ((n = Serial.read() + 1) < (MAX_POS >> 8)) {
+	if ((n = Serial.read() + 1) <= (MAX_POS >> 8)) {
 		max_pos = n << 8;
 		return 0;
 	}
