@@ -29,7 +29,6 @@ static void timer_init(void)
 	TCCR1A = 0;
 	TCCR1B = 0;
 	TCCR1C = 0;
-	TCNT1 = 0xffff;
 	TIMSK1 = 0;
 	TCCR1B = 0x05;	// F_CLK / 1024 (1tick = 64us @ 16MHz)
 }
@@ -37,6 +36,11 @@ static void timer_init(void)
 inline unsigned short timer_get(void)
 {
 	return TCNT1;
+}
+
+inline void timer_set(unsigned short t)
+{
+	TCNT1 = t;
 }
 
 static void event_init(void)
@@ -151,8 +155,8 @@ static int do_log(void)
 	noInterrupts();
 
 	event_index = 0;
-	result_init();
-	timer_init();
+	result_index = 0;
+	timer_set(0xffff);
 
 	while (1) {
 		/* wait for next timing */
@@ -161,25 +165,57 @@ static int do_log(void)
 
 		/* timer overflow */
 		if (curr_timer >= max_pos)
-			break;
+			goto fin0;
 
 		/* do output event */
 		if (event_index < event_entry &&
+		    event[event_index].evt == EVT_SET &&
 		    event[event_index].pos == curr_timer) {
 			gpio_out(event[event_index].val);
 			event_index++;
 		}
 
 		/* capture input event */
-		if (result_index < MAX_ENTRY &&
-		    (curr_status = gpio_in()) != prev_status) {
+		if ((curr_status = gpio_in()) != prev_status &&
+		    result_index < MAX_ENTRY) {
 			prev_status = curr_status;
 			result[result_index].pos = curr_timer;
 			result[result_index].val = curr_status;
 			result_index++;
 		}
+
+		/* wait signal change and restart logging */
+		if (event_index < event_entry &&
+		    event[event_index].evt == EVT_CHGSTS &&
+		    event[event_index].val) {
+
+			/* result[0]: status before signal change */
+			result_index = 0;
+			result[result_index].pos =
+				(prev_timer = event[event_index].pos);
+			result[result_index].val = curr_status;
+			if (result_index < MAX_ENTRY) result_index++;
+
+			/* wait for event change */
+			timer_set(0x0000);
+			while (1) {
+				/* timeout */
+				if (timer_get() >= max_pos)
+				goto fin0;
+
+				/* event change */
+				if ((gpio_in() ^ curr_status) &
+					event[event_index].val)
+				break;
+			}
+
+			/* renew timer at new value (start log immediately) */
+			timer_set(prev_timer + 1);
+			event_index++;
+		}
 	}
 
+fin0:
 	interrupts();
 
 	return 0;
@@ -230,6 +266,7 @@ void setup(void)
 	Serial.begin(115200);
 	event_init();
 	result_init();
+	timer_init();
 	gpio_init();
 }
 
