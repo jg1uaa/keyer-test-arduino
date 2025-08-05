@@ -263,7 +263,7 @@ static int set_maxpos(void)
 
 void setup(void)
 {
-	Serial.begin(115200);
+	Serial.begin(38400);
 	event_init();
 	result_init();
 	timer_init();
