@@ -224,7 +224,7 @@ fin0:
 static int send_result(void)
 {
 	Serial.write(result_index - 1);
-	for (int i = 0; i < MAX_ENTRY; i++) {
+	for (int i = 0; i < result_index; i++) {
 		Serial.write((unsigned char *)&result[i], sizeof(struct event));
 		Serial.flush();
 	}
