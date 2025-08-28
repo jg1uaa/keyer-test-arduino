@@ -40,7 +40,8 @@ inline unsigned short timer_get(void)
 
 inline void timer_set(unsigned short t)
 {
-	TCNT1 = t;
+	TCNT1 = t - 1;
+	while (TCNT1 != t);
 }
 
 static void event_init(void)
